@@ -8,10 +8,8 @@
 
 import { Command } from "commander";
 import fs from "node:fs";
-import path from "node:path";
-import os from "node:os";
 
-const PID_FILE = path.join(os.homedir(), ".persona-engine", "daemon.pid");
+import { PID_FILE } from "../../../daemon/src/config.js";
 
 export const stopCommand = new Command("stop")
   .description("Stop the running Persona Engine daemon")

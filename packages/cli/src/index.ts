@@ -10,6 +10,7 @@ import { Command } from "commander";
 import { startCommand } from "./commands/start.js";
 import { stopCommand } from "./commands/stop.js";
 import { statusCommand } from "./commands/status.js";
+import { onboardCommand } from "./commands/onboard.js";
 
 const program = new Command();
 
@@ -19,6 +20,7 @@ program
   .version("0.1.0");
 
 // 注册子命令
+program.addCommand(onboardCommand);
 program.addCommand(startCommand);
 program.addCommand(stopCommand);
 program.addCommand(statusCommand);

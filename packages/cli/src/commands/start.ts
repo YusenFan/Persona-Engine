@@ -12,10 +12,8 @@ import { Command } from "commander";
 import { spawn, fork } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import os from "node:os";
 
-/** PID 文件路径 — 与 daemon 侧的 config.ts 保持一致 */
-const PID_FILE = path.join(os.homedir(), ".persona-engine", "daemon.pid");
+import { PID_FILE } from "../../../daemon/src/config.js";
 
 /** daemon 入口文件路径（构建后的位置） */
 const DAEMON_ENTRY = path.resolve(

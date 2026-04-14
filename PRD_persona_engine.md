@@ -278,8 +278,8 @@ Location: `~/.persona-engine/config.json`
     "host": "127.0.0.1"
   },
   "llm": {
-    "provider": "anthropic",
-    "model": "claude-sonnet-4-20250514",
+    "provider": "openai",
+    "model": "gpt-5.4",
     "apiKey": "sk-ant-..."
   },
   "dreaming": {

@@ -60,3 +60,64 @@ packages/cli/src/
 - TUI 实时刷新事件流和统计面板
 - `persona status` 显示 daemon 运行状态
 - `persona stop` 正常关闭 daemon
+
+## 2026-04-13 — Phase 2: Onboarding + Directory Scan
+
+### What was built
+
+Phase 2 实现了完整的 onboarding 流程：交互式问卷、目录扫描、LLM 生成 USER.md、用户审核/编辑/带反馈重新生成。运行 `persona onboard` 即可从零开始构建用户 persona。
+
+### Tech decisions made
+
+| Decision | Choice | Reason |
+|----------|--------|--------|
+| LLM provider | OpenAI (gpt-5.4) | 用户指定使用 OpenAI API |
+| LLM SDK | Vercel AI SDK (`ai` + `@ai-sdk/openai`) | 多 provider 支持，PRD 推荐 |
+| Onboarding UI | @clack/prompts | Phase 1 已决定 |
+| 问卷字段 | name, birthday, pronouns, timezone, occupation, interests, social profiles | 用户要求合并 name/preferred name 为单一字段，增加 birthday，增加社交媒体链接 |
+| 文档扫描 | 文件名作为标题信号（不解析内容） | PDF/Word/Excel/Apple iWork 文件只取文件名，避免复杂解析依赖 |
+
+### Files created
+
+```
+packages/daemon/src/onboarding/
+  ├── questionnaire.ts  — 交互式问卷（@clack/prompts），收集用户信息和目录
+  ├── scanner.ts        — 目录扫描器：树结构 + 关键文件 + 文档检测（PDF/Word/Excel/Pages/Numbers/Keynote）
+  ├── llm.ts            — LLM 客户端工厂（Vercel AI SDK + OpenAI provider）
+  └── generator.ts      — USER.md 生成器，支持带用户反馈的重新生成
+
+packages/cli/src/commands/
+  └── onboard.ts        — `persona onboard` 完整流程命令
+
+templates/
+  └── USER.md           — 默认 persona 模板（含 birthday 字段）
+```
+
+### Files modified
+
+- `packages/daemon/src/config.ts` — 新增 `USER_MD_PATH`、`isOnboarded()`，默认 LLM 改为 OpenAI/gpt-5.4；数据目录从 `~/.persona-engine/` 改为 `<project>/persona-engine/`
+- `packages/cli/src/index.ts` — 注册 onboard 命令
+- `packages/cli/src/commands/start.ts` — 从 config.ts 导入 PID_FILE，不再硬编码 `~/.persona-engine/` 路径
+- `packages/cli/src/commands/stop.ts` — 同上
+- `packages/cli/src/commands/status.ts` — 同上，使用 loadConfig() 读取端口号
+- `packages/daemon/package.json` — 新增依赖：ai, @ai-sdk/openai, @ai-sdk/anthropic, @clack/prompts
+- `packages/cli/package.json` — 新增依赖：@clack/prompts, ai, @ai-sdk/openai
+- `.gitignore` — `.persona-engine/` 改为 `persona-engine/`
+
+### Design decisions
+
+1. **Onboarding 不依赖 daemon 运行** — onboarding 是独立的 CLI 流程，直接 import daemon 的 onboarding 模块源码（通过相对路径），tsup 打包时内联。
+2. **重新生成带反馈** — 用户选择 regenerate 时可以输入修改意见（如"多加 Python 经验描述"），LLM 会基于上一版 USER.md + 反馈进行修改。
+3. **目录扫描兼容非技术文件夹** — 不仅扫描代码项目，也检测普通文档文件（PDF, Word, Excel, Apple iWork），用文件名作为内容信号。
+4. **已有 persona 检测** — 重复运行 `persona onboard` 会提示 reset/update/cancel。
+5. **社交媒体收集** — 问卷中收集 LinkedIn、X (Twitter)、Instagram 及其他社交/作品集链接（均为可选），传给 LLM 以生成更丰富的用户画像。
+6. **必填字段防空输入** — 必填问题（name、occupation、API key）使用 `requiredText()` / `requiredPassword()` 循环，空输入时重新提示而非终止流程。
+7. **系统原生目录选择器** — macOS 上使用 `osascript choose folder` 弹出 Finder 文件夹选择对话框，用户可视化选择目录，无需手动输入路径。非 macOS 回退为手动输入。
+8. **数据目录改为项目内非隐藏目录** — 从 `~/.persona-engine/`（用户主目录隐藏文件夹）改为 `<project>/persona-engine/`（项目目录内可见文件夹）。通过 `import.meta.dirname` 从构建产物位置反推项目根目录，CLI 和 daemon 两端路径一致。所有 CLI 命令统一从 config.ts 导入路径常量，不再各自硬编码。
+
+### Verification results
+
+- `pnpm build` 编译成功
+- `persona onboard --help` 正常显示帮助信息
+- CLI 命令列表包含 onboard（排在 start/stop/status 之前）
+- 数据目录路径正确解析：CLI 和 daemon 均指向 `<project>/persona-engine/`

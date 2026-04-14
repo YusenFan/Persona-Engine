@@ -8,24 +8,19 @@
 
 import { Command } from "commander";
 import fs from "node:fs";
-import path from "node:path";
-import os from "node:os";
 
-const PID_FILE = path.join(os.homedir(), ".persona-engine", "daemon.pid");
-const CONFIG_PATH = path.join(os.homedir(), ".persona-engine", "config.json");
+import { PID_FILE, loadConfig } from "../../../daemon/src/config.js";
 
 /** 默认端口，与 daemon config 保持一致 */
 const DEFAULT_PORT = 19000;
 
 /**
- * 从 config.json 读取 daemon 端口号。
- * 读取失败则返回默认值。
+ * 从配置读取 daemon 端口号。
  */
 function getDaemonPort(): number {
   try {
-    const raw = fs.readFileSync(CONFIG_PATH, "utf-8");
-    const config = JSON.parse(raw);
-    return config?.daemon?.port ?? DEFAULT_PORT;
+    const config = loadConfig();
+    return config.daemon.port ?? DEFAULT_PORT;
   } catch {
     return DEFAULT_PORT;
   }

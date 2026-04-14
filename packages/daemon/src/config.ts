@@ -1,13 +1,13 @@
 /**
  * config.ts — 配置管理模块
  *
- * 负责读取、写入和合并 ~/.persona-engine/config.json。
+ * 负责读取、写入和合并 persona-engine/config.json。
+ * 数据目录在项目根目录下的 persona-engine/ 文件夹中（不隐藏）。
  * 配置文件不存在时自动创建默认配置。
  */
 
 import fs from "node:fs";
 import path from "node:path";
-import os from "node:os";
 
 // ── 类型定义 ────────────────────────────────────────────
 
@@ -68,8 +68,15 @@ export interface PersonaConfig {
 
 // ── 默认值 ──────────────────────────────────────────────
 
-/** 数据目录路径：~/.persona-engine/ */
-export const DATA_DIR = path.join(os.homedir(), ".persona-engine");
+/**
+ * 项目根目录 — 从构建产物位置反推：
+ * daemon 构建产物在 packages/daemon/dist/，CLI 构建产物在 packages/cli/dist/
+ * 两者都是 ../../.. 回到项目根目录。
+ */
+const PROJECT_ROOT = path.resolve(import.meta.dirname, "../../..");
+
+/** 数据目录路径：<project>/persona-engine/ */
+export const DATA_DIR = path.join(PROJECT_ROOT, "persona-engine");
 
 /** 配置文件路径 */
 const CONFIG_PATH = path.join(DATA_DIR, "config.json");
@@ -80,6 +87,14 @@ export const PID_FILE = path.join(DATA_DIR, "daemon.pid");
 /** events.sqlite 数据库路径 */
 export const DB_PATH = path.join(DATA_DIR, "events.sqlite");
 
+/** USER.md 路径 */
+export const USER_MD_PATH = path.join(DATA_DIR, "USER.md");
+
+/** 检查是否已完成 onboarding（USER.md 是否存在） */
+export function isOnboarded(): boolean {
+  return fs.existsSync(USER_MD_PATH);
+}
+
 /** 默认配置 — 所有字段都有合理的初始值 */
 const DEFAULT_CONFIG: PersonaConfig = {
   daemon: {
@@ -87,8 +102,8 @@ const DEFAULT_CONFIG: PersonaConfig = {
     host: "127.0.0.1", // 只监听本地，不暴露到网络
   },
   llm: {
-    provider: "anthropic",
-    model: "claude-sonnet-4-20250514",
+    provider: "openai",
+    model: "gpt-5.4",
     apiKey: "", // 用户需要自己填
   },
   dreaming: {
