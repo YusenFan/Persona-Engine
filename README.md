@@ -2,7 +2,7 @@
 
 > A local-first system that actively builds a living behavioral model of you.
 
-Persona Engine observes your file directories, browser activity, and chat conversations to construct a continuously updated understanding of who you are. All data stays on your machine. An LLM processes raw activity in nightly "dreaming" sessions to classify events, infer patterns, and maintain a structured persona. The persona then feeds into a chat interface, giving any AI assistant deep context about you.
+Persona Engine is a personal AI memory engine that continuously evolves based on your local files, browser activity, and everyday application usage. In a world where most of our information exchange already happens through digital devices, Persona Engine takes a different approach — instead of relying on fragmented inputs, it learns directly from your system-level data to build a more complete understanding of you.
 
 ## How It Works
 
