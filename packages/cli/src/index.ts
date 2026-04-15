@@ -11,6 +11,7 @@ import { startCommand } from "./commands/start.js";
 import { stopCommand } from "./commands/stop.js";
 import { statusCommand } from "./commands/status.js";
 import { onboardCommand } from "./commands/onboard.js";
+import { dreamCommand } from "./commands/dream.js";
 
 const program = new Command();
 
@@ -24,6 +25,7 @@ program.addCommand(onboardCommand);
 program.addCommand(startCommand);
 program.addCommand(stopCommand);
 program.addCommand(statusCommand);
+program.addCommand(dreamCommand);
 
 // 解析命令行参数并执行
 program.parse();

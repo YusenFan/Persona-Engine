@@ -1,7 +1,7 @@
 /**
  * tui/App.tsx — Ink TUI 根组件
  *
- * 整合事件流和统计面板，组成完整的终端界面。
+ * 整合事件流、统计面板和 dreaming 状态，组成完整的终端界面。
  * 布局：
  *   ┌─ Header ───────────────────┐
  *   │ Persona Engine v0.1.0      │
@@ -10,6 +10,8 @@
  *   │ [14:35] docs.rs      5m 🔖│
  *   ├─ Summary ──────────────────┤
  *   │ Events: 47 · Deep reads: 8 │
+ *   ├─ Dreaming ─────────────────┤
+ *   │ 🧠 Classifying 47 events...│
  *   ├─ Footer ───────────────────┤
  *   │ [q] quit · [d] dream       │
  *   └───────────────────────────┘
@@ -29,6 +31,12 @@ interface AppProps {
   stats: TodayStats;
   /** HTTP 服务器监听地址（显示在 header） */
   serverAddress: string;
+  /** Dreaming 日志消息 */
+  dreamingLog?: string[];
+  /** 是否正在 dreaming */
+  isDreaming?: boolean;
+  /** 手动触发 dreaming 回调 */
+  onDream?: () => void;
 }
 
 /**
@@ -41,15 +49,24 @@ const isInteractive = process.stdin.isTTY === true;
  * TUI 根组件。
  * 使用 Ink 的 Box 做 flexbox 布局，竖向排列三个区域。
  */
-export function App({ events, stats, serverAddress }: AppProps) {
+export function App({
+  events,
+  stats,
+  serverAddress,
+  dreamingLog = [],
+  isDreaming = false,
+  onDream,
+}: AppProps) {
   const { exit } = useApp();
 
   // 键盘快捷键处理 — 只在交互式终端下启用
-  // 后台模式没有 TTY，useInput 会因为无法启用 raw mode 而报错
   useInput(
     (input, key) => {
       if (input === "q" || (key.ctrl && input === "c")) {
         exit();
+      }
+      if (input === "d" && onDream) {
+        onDream();
       }
     },
     { isActive: isInteractive }
@@ -84,10 +101,29 @@ export function App({ events, stats, serverAddress }: AppProps) {
         <Summary stats={stats} />
       </Box>
 
+      {/* ── Dreaming 状态 ─────────────────────── */}
+      {dreamingLog.length > 0 && (
+        <Box
+          flexDirection="column"
+          borderStyle="single"
+          borderColor={isDreaming ? "yellow" : "green"}
+          paddingX={1}
+        >
+          <Text bold color={isDreaming ? "yellow" : "green"}>
+            {isDreaming ? "🧠 Dreaming..." : "🧠 Dreaming"}
+          </Text>
+          {dreamingLog.slice(-5).map((msg, i) => (
+            <Text key={i} dimColor={!isDreaming}>
+              {msg}
+            </Text>
+          ))}
+        </Box>
+      )}
+
       {/* ── 底部快捷键提示 ─────────────────────── */}
       <Box paddingX={1} gap={2}>
         <Text dimColor>[q] quit</Text>
-        <Text dimColor>[d] dream</Text>
+        <Text dimColor>[d] dream{isDreaming ? " (running...)" : ""}</Text>
         <Text dimColor>[s] status</Text>
       </Box>
     </Box>

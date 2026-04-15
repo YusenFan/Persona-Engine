@@ -19,6 +19,8 @@ import { loadConfig, PID_FILE, ensureDataDir } from "./config.js";
 import { initDatabase, closeDatabase, getRecentEvents, getTodayStats } from "./db/events.js";
 import { createServer, startServer } from "./server.js";
 import { App } from "./tui/App.js";
+import { startScheduler, stopScheduler } from "./dreaming/scheduler.js";
+import { runDreaming, type DreamingProgress } from "./dreaming/index.js";
 
 /** TUI 刷新间隔（毫秒）— 每秒刷新一次统计数据 */
 const TUI_REFRESH_INTERVAL_MS = 1000;
@@ -50,7 +52,35 @@ async function main() {
   ensureDataDir();
   fs.writeFileSync(PID_FILE, process.pid.toString(), "utf-8");
 
-  // ── 5. 渲染 TUI ────────────────────────────
+  // ── 5. 启动 Dreaming 调度器 ─────────────────
+  /** 当前的 dreaming 进度消息（TUI 显示用） */
+  let dreamingLog: string[] = [];
+  let isDreaming = false;
+
+  /** Dreaming 进度回调 — 更新 TUI */
+  function onDreamingProgress(progress: DreamingProgress) {
+    isDreaming = progress.stage !== "done" && progress.stage !== "error";
+    dreamingLog.push(progress.message);
+    // 只保留最近 10 条
+    if (dreamingLog.length > 10) {
+      dreamingLog = dreamingLog.slice(-10);
+    }
+    rerender?.();
+  }
+
+  startScheduler(config.dreaming.schedule, onDreamingProgress);
+
+  /** 手动触发 dreaming（[d] 键） */
+  async function triggerDream() {
+    if (isDreaming) return; // 防止重复触发
+    try {
+      await runDreaming(undefined, onDreamingProgress);
+    } catch {
+      // error 已经通过 onDreamingProgress 报告
+    }
+  }
+
+  // ── 6. 渲染 TUI ────────────────────────────
   /**
    * 获取 TUI 需要的数据并触发渲染。
    * 数据来自 SQLite 查询，每次调用都是最新的。
@@ -58,7 +88,16 @@ async function main() {
   function renderTui() {
     const events = getRecentEvents(50);
     const stats = getTodayStats();
-    return <App events={events} stats={stats} serverAddress={address} />;
+    return (
+      <App
+        events={events}
+        stats={stats}
+        serverAddress={address}
+        dreamingLog={dreamingLog}
+        isDreaming={isDreaming}
+        onDream={triggerDream}
+      />
+    );
   }
 
   // 首次渲染
@@ -74,13 +113,14 @@ async function main() {
     rerender?.();
   }, TUI_REFRESH_INTERVAL_MS);
 
-  // ── 6. Graceful shutdown ────────────────────
+  // ── 7. Graceful shutdown ────────────────────
   /**
    * 清理函数：关闭所有子系统。
    * 无论是用户按 q、Ctrl+C 还是收到 SIGTERM，都走这个流程。
    */
   async function shutdown() {
     clearInterval(refreshTimer);
+    stopScheduler();
     inkInstance.unmount();
 
     // 关闭 HTTP 服务器（等待进行中的请求完成）

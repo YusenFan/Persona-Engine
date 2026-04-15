@@ -220,6 +220,99 @@ export function getRecentEvents(limit = 50): EventRow[] {
  * "今日" 定义为 UTC 当天 00:00 至现在。
  * 返回事件数、深度阅读数、上下文切换数、总浏览时间、聊天消息数、待处理数。
  */
+/**
+ * 获取所有已使用的 tags（去重），用于 dreaming 分类时的受控词汇表。
+ * 从 classified 事件的 tags 字段中提取。
+ */
+export function getAllTags(): string[] {
+  const d = getDatabase();
+  const rows = d
+    .prepare(
+      `SELECT DISTINCT tags FROM events WHERE tags IS NOT NULL AND status = 'classified'`
+    )
+    .all() as Array<{ tags: string }>;
+
+  const tagSet = new Set<string>();
+  for (const row of rows) {
+    const parsed = JSON.parse(row.tags) as string[];
+    for (const tag of parsed) {
+      tagSet.add(tag);
+    }
+  }
+  return Array.from(tagSet).sort();
+}
+
+/**
+ * 获取指定时间范围内的 pending 事件。
+ *
+ * @param since  ISO 时间字符串，只返回 created_at >= since 的事件
+ * @param limit  最多返回多少条
+ */
+export function getPendingEventsSince(
+  since?: string,
+  limit = 5000
+): EventRow[] {
+  const d = getDatabase();
+  if (since) {
+    return d
+      .prepare(
+        `SELECT * FROM events WHERE status = 'pending' AND created_at >= ? ORDER BY created_at ASC LIMIT ?`
+      )
+      .all(since, limit) as EventRow[];
+  }
+  return d
+    .prepare(
+      `SELECT * FROM events WHERE status = 'pending' ORDER BY created_at ASC LIMIT ?`
+    )
+    .all(limit) as EventRow[];
+}
+
+/**
+ * 批量标记事件为 classified，写入 tags 和 dreaming_run_id。
+ */
+export function markEventsClassified(
+  updates: Array<{ id: number; tags: string[] }>,
+  runId: string
+): void {
+  const d = getDatabase();
+  const stmt = d.prepare(`
+    UPDATE events
+    SET status = 'classified',
+        tags = @tags,
+        classified_at = datetime('now'),
+        dreaming_run_id = @runId
+    WHERE id = @id
+  `);
+
+  const batch = d.transaction(
+    (items: Array<{ id: number; tags: string[] }>) => {
+      for (const item of items) {
+        stmt.run({
+          id: item.id,
+          tags: JSON.stringify(item.tags),
+          runId,
+        });
+      }
+    }
+  );
+  batch(updates);
+}
+
+/**
+ * 获取最近 N 天内已分类的事件（用于 pattern inference）。
+ */
+export function getClassifiedEventsSince(
+  since: string,
+  limit = 5000
+): EventRow[] {
+  const d = getDatabase();
+  return d
+    .prepare(
+      `SELECT * FROM events WHERE status = 'classified' AND created_at >= ? ORDER BY created_at ASC LIMIT ?`
+    )
+    .all(since, limit) as EventRow[];
+}
+
 export function getTodayStats(): TodayStats {
   const d = getDatabase();
 
