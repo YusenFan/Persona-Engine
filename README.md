@@ -4,6 +4,10 @@
 
 Persona Engine is a personal AI memory engine that continuously evolves based on your local files, browser activity, and everyday application usage. In a world where most of our information exchange already happens through digital devices, Persona Engine takes a different approach — instead of relying on fragmented inputs, it learns directly from your system-level data to build a more complete understanding of you.
 
+![Persona Engine interface](./persona_engine.png)
+
+
+
 ## How It Works
 
 ```
