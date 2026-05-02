@@ -1,13 +1,13 @@
 /**
  * config.ts — 配置管理模块
  *
- * 负责读取、写入和合并 persona-engine/config.json。
- * 数据目录在项目根目录下的 persona-engine/ 文件夹中（不隐藏）。
+ * 负责读取、写入和合并 ~/.persona-engine/config.json。
  * 配置文件不存在时自动创建默认配置。
  */
 
 import fs from "node:fs";
 import path from "node:path";
+import os from "node:os";
 
 // ── 类型定义 ────────────────────────────────────────────
 
@@ -68,15 +68,8 @@ export interface PersonaConfig {
 
 // ── 默认值 ──────────────────────────────────────────────
 
-/**
- * 项目根目录 — 从构建产物位置反推：
- * daemon 构建产物在 packages/daemon/dist/，CLI 构建产物在 packages/cli/dist/
- * 两者都是 ../../.. 回到项目根目录。
- */
-const PROJECT_ROOT = path.resolve(import.meta.dirname, "../../..");
-
-/** 数据目录路径：<project>/persona-engine/ */
-export const DATA_DIR = path.join(PROJECT_ROOT, "persona-engine");
+/** 数据目录路径：~/.persona-engine/ */
+export const DATA_DIR = path.join(os.homedir(), ".persona-engine");
 
 /** 配置文件路径 */
 const CONFIG_PATH = path.join(DATA_DIR, "config.json");
@@ -103,7 +96,7 @@ const DEFAULT_CONFIG: PersonaConfig = {
   },
   llm: {
     provider: "openai",
-    model: "gpt-5.4",
+    model: "gpt-5.4-2026-03-05",
     apiKey: "", // 用户需要自己填
   },
   dreaming: {
@@ -171,64 +164,6 @@ export function saveConfig(config: PersonaConfig): void {
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2) + "\n", {
     mode: 0o600, // 权限 600：只有文件所有者可读写（保护 API key）
   });
-}
-
-/**
- * 验证配置文件的关键字段。
- * 返回错误消息数组，空数组表示验证通过。
- */
-export function validateConfig(config: PersonaConfig): string[] {
-  const errors: string[] = [];
-
-  // Daemon
-  if (config.daemon.port < 1 || config.daemon.port > 65535) {
-    errors.push(`daemon.port must be 1-65535, got ${config.daemon.port}`);
-  }
-
-  // LLM
-  if (!config.llm.provider) {
-    errors.push("llm.provider is required (e.g., openai, anthropic)");
-  }
-  if (!config.llm.model) {
-    errors.push("llm.model is required");
-  }
-
-  // Dreaming
-  if (config.dreaming.decayHalfLifeDays < 1) {
-    errors.push("dreaming.decayHalfLifeDays must be >= 1");
-  }
-  if (config.dreaming.userMdTokenBudget < 500) {
-    errors.push("dreaming.userMdTokenBudget must be >= 500");
-  }
-
-  // Events
-  if (config.events.retentionDays < 1) {
-    errors.push("events.retentionDays must be >= 1");
-  }
-
-  return errors;
-}
-
-/**
- * 清理残留的 PID 文件（如果对应进程已不存在）。
- * 返回 true 表示有残留且已清理。
- */
-export function cleanStalePidFile(): boolean {
-  if (!fs.existsSync(PID_FILE)) return false;
-
-  const pid = parseInt(fs.readFileSync(PID_FILE, "utf-8").trim(), 10);
-  if (isNaN(pid)) {
-    fs.unlinkSync(PID_FILE);
-    return true;
-  }
-
-  try {
-    process.kill(pid, 0);
-    return false; // 进程还在运行
-  } catch {
-    fs.unlinkSync(PID_FILE);
-    return true;
-  }
 }
 
 // ── 内部工具函数 ────────────────────────────────────────
